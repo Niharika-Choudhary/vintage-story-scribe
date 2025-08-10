@@ -50,15 +50,26 @@ export function generateBook(opts: GenerateOptions): Book {
     const toneWord = sample(toneWords, rand(seed + idx) * 3.3);
     const title = `Chapter ${idx}: ${toneWord[0].toUpperCase()}${toneWord.slice(1)} Paths`;
 
-    const para = (n: number) =>
-      `\n\n${Array.from({ length: n })
-        .map(() =>
-          ` ${opts.idea} — In a ${vibe} tone (level ${opts.tone}), the tale unfolds with ${opts.renameCharacters ? "newly named" : "familiar"} figures,\n` +
-          ` brushed in muted greens and warm browns, as destinies tangle like threads in a loom.`
-        )
-        .join("\n")}`;
+    const parasPerChapter = Math.max(2, Math.min(12, Math.round(opts.pages / Math.max(opts.chapters, 1) / 3)));
 
-    const content = `The ${mat} whispers of bygone days as our story begins.${para(3)}`;
+    const buildParagraph = (pIndex: number) => {
+      const mood = `${vibe} tone (level ${opts.tone})`;
+      const cast = opts.renameCharacters ? "a freshly renamed cast" : "a familiar cast";
+      const textures = [
+        "muted greens and warm browns",
+        "soft gold light and sea-glass hues",
+        "beige dawns and weathered wood",
+      ];
+      const texture = sample(textures, rand(seed + idx * (pIndex + 1)) * 5.7);
+      return ` In a ${mood}, the narrative widens as ${cast} crosses paths,\n brushed in ${texture}, while destinies knit like threads on a loom.\n Subplots bud and secrets surface, advancing stakes without repeating the original prompt.`;
+    };
+
+    const intro = `The ${mat} whispers of bygone days as our story begins.`;
+    const body = Array.from({ length: parasPerChapter })
+      .map((_, j) => `\n\n${buildParagraph(j)}`)
+      .join("");
+
+    const content = `${intro}${body}`;
 
     return { id: crypto.randomUUID(), title, content };
   });

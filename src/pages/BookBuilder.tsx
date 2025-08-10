@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { Book, Chapter, GenerateOptions, generateBook } from "@/utils/generateBook";
+import { Book, Chapter, GenerateOptions } from "@/utils/generateBook";
+import { generateBookAI, downloadBookPdf } from "@/services/bookApi";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -32,6 +33,8 @@ const BookBuilder = () => {
   const [book, setBook] = useState<Book | null>(null);
   const [activeChapter, setActiveChapter] = useState<Chapter | null>(null);
   const [regenPrompt, setRegenPrompt] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [preparingPdf, setPreparingPdf] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,7 +54,7 @@ const BookBuilder = () => {
     if (book) debouncedSave(book);
   }, [book]);
 
-  const onGenerate = () => {
+  const onGenerate = async () => {
     if (!idea.trim()) {
       toast({ title: "Add your story idea", description: "Please provide a main idea to begin." });
       return;
@@ -64,9 +67,16 @@ const BookBuilder = () => {
       renameCharacters: rename,
       author: author.trim() || "Anonymous",
     };
-    const b = generateBook(opts);
-    setBook(b);
-    toast({ title: "Book generated", description: "Chapters are ready for review." });
+    try {
+      setGenerating(true);
+      const b = await generateBookAI(opts);
+      setBook(b);
+      toast({ title: "Book generated", description: "Chapters are ready for review." });
+    } catch (e) {
+      toast({ title: "Generation failed", description: "Using fallback generator.", variant: "destructive" as any });
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const updateChapter = (id: string, patch: Partial<Chapter>) => {
@@ -86,7 +96,7 @@ const BookBuilder = () => {
     toast({ title: "Chapter updated", description: "Review the revised content." });
   };
 
-  const onDownloadPDF = async () => {
+  const downloadPdfFallback = async () => {
     if (!contentRef.current) return;
 
     const node = contentRef.current;
@@ -116,6 +126,21 @@ const BookBuilder = () => {
     pdf.save(`${book?.title || "story"}.pdf`);
   };
 
+  const onDownloadPDF = async () => {
+    if (!book) return;
+    setPreparingPdf(true);
+    try {
+      const ok = await downloadBookPdf(book.id, `${book.title || "story"}.pdf`);
+      if (!ok) {
+        await downloadPdfFallback();
+      }
+    } catch (e) {
+      await downloadPdfFallback();
+    } finally {
+      setPreparingPdf(false);
+    }
+  };
+
   const toc = useMemo(() => book?.chapters.map((c, idx) => ({ idx: idx + 1, id: c.id, title: c.title })) || [], [book]);
 
   const clearSession = () => {
@@ -132,7 +157,7 @@ const BookBuilder = () => {
             <h1 className="font-display text-xl">StoryForge</h1>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={onDownloadPDF} disabled={!book}>Download PDF</Button>
+            <Button variant="secondary" onClick={onDownloadPDF} disabled={!book || preparingPdf}>Download PDF</Button>
             <Button variant="outline" onClick={() => { localStorage.removeItem("sf_book"); setBook(null); }}>New Book</Button>
             <Button variant="destructive" onClick={clearSession}>Logout</Button>
           </div>
@@ -167,7 +192,19 @@ const BookBuilder = () => {
               <Checkbox id="rename" checked={rename} onCheckedChange={(v) => setRename(!!v)} />
               <Label htmlFor="rename">Change character names from the prompt</Label>
             </div>
-            <Button className="w-full" onClick={onGenerate}>Generate Book</Button>
+            <Button className="w-full" onClick={onGenerate} disabled={generating}>
+              {generating ? (
+                <span className="inline-flex items-center gap-2">
+                  <svg className="size-4 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                  Generating…
+                </span>
+              ) : (
+                "Generate Book"
+              )}
+            </Button>
           </div>
         </div>
 
