@@ -27,7 +27,8 @@ export async function generateBookAI(opts: GenerateOptions): Promise<Book> {
 export async function downloadBookPdf(bookId: string, fileName: string): Promise<boolean> {
   try {
     const res = await fetch(`/api/books/${bookId}/pdf`, { method: "GET" });
-    if (!res.ok) return false;
+    const ct = res.headers.get("Content-Type") || "";
+    if (!res.ok || !ct.includes("application/pdf")) return false;
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

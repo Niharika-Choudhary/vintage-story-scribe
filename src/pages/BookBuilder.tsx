@@ -36,6 +36,7 @@ const BookBuilder = () => {
   const [generating, setGenerating] = useState(false);
   const [preparingPdf, setPreparingPdf] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+  const pdfRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     document.title = "Book Builder | StoryForge";
@@ -97,9 +98,9 @@ const BookBuilder = () => {
   };
 
   const downloadPdfFallback = async () => {
-    if (!contentRef.current) return;
+    const node = pdfRef.current || contentRef.current;
+    if (!node) return;
 
-    const node = contentRef.current;
     const canvas = await html2canvas(node, { scale: 2 });
     const imgData = canvas.toDataURL("image/jpeg", 0.95);
 
@@ -279,6 +280,54 @@ const BookBuilder = () => {
           </div>
         </div>
       </section>
+
+      {book && (
+        <div ref={pdfRef} className="absolute -left-[9999px] top-0 w-[794px] bg-background text-foreground p-8">
+          <div className="space-y-6">
+            <div className="text-center space-y-1">
+              <h2 className="font-display text-3xl">{book.title}</h2>
+              <p className="text-muted-foreground">by {book.author}</p>
+            </div>
+            {book.dedication && (
+              <blockquote className="italic text-sm text-muted-foreground border-l-2 pl-3">{book.dedication}</blockquote>
+            )}
+            <div>
+              <h3 className="font-display text-xl mb-2">Table of Contents</h3>
+              <ol className="list-decimal pl-5 space-y-1">
+                {toc.map((t) => (
+                  <li key={t.id}>{t.idx}. {t.title}</li>
+                ))}
+              </ol>
+            </div>
+            <div className="space-y-8">
+              {book.chapters.map((c) => (
+                <article key={c.id} className="space-y-3">
+                  <h4 className="font-display text-lg">{c.title}</h4>
+                  <div className="space-y-3 text-justify leading-7 whitespace-pre-wrap">
+                    {c.content}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={preparingPdf}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display">Preparing your PDF</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <svg className="size-4 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+            </svg>
+            <p>Your book is being prepared. The download will start automatically.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </main>
   );
 };
